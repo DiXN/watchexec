@@ -39,7 +39,7 @@ pub fn run<F>(args: cli::Args, cb: F) -> Result<()> where F: Fn(Vec<PathOp>) {
     let filter = NotificationFilter::new(args.filters, args.ignores, gitignore)?;
 
     let (tx, rx) = channel();
-    let (poll, poll_interval) = (args.poll, args.poll_interval).clone();
+    let (poll, _) = (args.poll, args.poll_interval).clone();
 
     let watcher = Watcher::new(tx.clone(), &paths, args.poll, args.poll_interval).or_else(|err| {
         if poll {

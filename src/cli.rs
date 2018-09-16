@@ -1,7 +1,7 @@
 use std::path::MAIN_SEPARATOR;
 use std::process::Command;
 
-use clap::{App, Arg, Error};
+use clap::{App, Arg};
 
 #[derive(Debug)]
 pub struct Args {
@@ -9,8 +9,6 @@ pub struct Args {
     pub filters: Vec<String>,
     pub ignores: Vec<String>,
     pub clear_screen: bool,
-    pub signal: Option<String>,
-    pub restart: bool,
     pub debounce: u64,
     pub debug: bool,
     pub run_initially: bool,
@@ -57,17 +55,6 @@ pub fn get_args() -> Args {
                  .help("Restart the process if it's still running")
                  .short("r")
                  .long("restart"))
-        .arg(Arg::with_name("signal")
-                 .help("Send signal to process upon changes, e.g. SIGHUP")
-                 .short("s")
-                 .long("signal")
-                 .takes_value(true)
-                 .number_of_values(1)
-                 .value_name("signal"))
-        .arg(Arg::with_name("kill")
-                 .help("Send SIGKILL to child processes (deprecated, use -s SIGKILL instead)")
-                 .short("k")
-                 .long("kill"))
         .arg(Arg::with_name("debounce")
                  .help("Set the timeout between detected change and command execution, defaults to 500ms")
                  .takes_value(true)
@@ -100,30 +87,14 @@ pub fn get_args() -> Args {
         .arg(Arg::with_name("no-default-ignore")
                  .help("Skip auto-ignoring of commonly ignored globs")
                  .long("no-default-ignore"))
-        .arg(Arg::with_name("postpone")
-                 .help("Wait until first change to execute command")
-                 .short("p")
-                 .long("postpone"))
         .arg(Arg::with_name("poll")
                  .help("Forces polling mode")
                  .long("force-poll")
                  .value_name("interval"))
-        .arg(Arg::with_name("no-shell")
-                 .help("Do not wrap command in 'sh -c' resp. 'cmd.exe /C'")
-                 .short("n")
-                 .long("no-shell"))
         .arg(Arg::with_name("once").short("1").hidden(true))
         .get_matches();
 
     let paths = values_t!(args.values_of("path"), String).unwrap_or(vec![String::from(".")]);
-
-    // Treat --kill as --signal SIGKILL (for compatibility with older syntax)
-    let signal = if args.is_present("kill") {
-        Some("SIGKILL".to_string())
-    } else {
-        // Convert Option<&str> to Option<String>
-        args.value_of("signal").map(str::to_string)
-    };
 
     let mut filters = values_t!(args.values_of("filter"), String).unwrap_or(vec![]);
 
@@ -167,25 +138,11 @@ pub fn get_args() -> Args {
         500
     };
 
-    if signal.is_some() && args.is_present("postpone") {
-        // TODO: Error::argument_conflict() might be the better fit, usage was unclear, though
-        Error::value_validation_auto("--postpone and --signal are mutually exclusive".to_string())
-            .exit();
-    }
-
-    if signal.is_some() && args.is_present("kill") {
-        // TODO: Error::argument_conflict() might be the better fit, usage was unclear, though
-        Error::value_validation_auto("--kill and --signal is ambiguous.\n       Hint: Use only '--signal SIGKILL' without --kill".to_string())
-            .exit();
-    }
-
     Args {
         paths: paths,
         filters: filters,
         ignores: ignores,
-        signal: signal,
         clear_screen: args.is_present("clear"),
-        restart: args.is_present("restart"),
         debounce: debounce,
         debug: args.is_present("verbose"),
         run_initially: !args.is_present("postpone"),

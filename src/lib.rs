@@ -20,7 +20,7 @@ extern crate mktemp;
 
 pub mod cli;
 pub mod error;
-mod gitignore;
+pub mod gitignore;
 mod notification_filter;
 pub mod pathop;
 pub mod run;
