@@ -23,9 +23,7 @@ pub mod error;
 mod gitignore;
 mod notification_filter;
 pub mod pathop;
-mod process;
 pub mod run;
-mod signal;
 mod watcher;
 
 pub use run::run;

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::fs::canonicalize;
 use std::io::Write;
 use std::sync::mpsc::{channel, Receiver};
-use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use cli;
@@ -11,10 +10,7 @@ use error::{Error, Result};
 use gitignore;
 use log;
 use notification_filter::NotificationFilter;
-use notify;
 use pathop::PathOp;
-use process::{self, Process};
-use signal::{self, Signal};
 use watcher::{Event, Watcher};
 
 fn init_logger(debug: bool) {
@@ -32,24 +28,6 @@ fn init_logger(debug: bool) {
 }
 
 pub fn run<F>(args: cli::Args, cb: F) -> Result<()> where F: Fn(Vec<PathOp>) {
-    let child_process: Arc<RwLock<Option<Process>>> = Arc::new(RwLock::new(None));
-    let weak_child = Arc::downgrade(&child_process);
-
-    // Convert signal string to the corresponding integer
-    let signal = signal::new(args.signal);
-
-    signal::install_handler(move |sig: Signal| {
-        if let Some(lock) = weak_child.upgrade() {
-            let strong = lock.read().unwrap();
-            if let Some(ref child) = *strong {
-                match sig {
-                    Signal::SIGCHLD => child.reap(), // SIGCHLD is special, initiate reap()
-                    _ => child.signal(sig),
-                }
-            }
-        }
-    });
-
     init_logger(args.debug);
 
     let mut paths = vec![];
@@ -97,7 +75,6 @@ pub fn run<F>(args: cli::Args, cb: F) -> Result<()> where F: Fn(Vec<PathOp>) {
 
         // Handle once option for integration testing
         if args.once {
-            signal_process(&child_process, signal, false);
             break;
         }
     }
@@ -148,20 +125,4 @@ fn wait_fs(rx: &Receiver<Event>, filter: &NotificationFilter, debounce: u64) -> 
     }
 
     paths
-}
-
-// signal_process sends signal to process. It waits for the process to exit if wait is true
-fn signal_process(process: &RwLock<Option<Process>>, signal: Option<Signal>, wait: bool) {
-    let guard = process.read().unwrap();
-
-    if let Some(ref child) = *guard {
-        if let Some(s) = signal {
-            child.signal(s);
-        }
-
-        if wait {
-            debug!("Waiting for process to exit...");
-            child.wait();
-        }
-    }
 }
